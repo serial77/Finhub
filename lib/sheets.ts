@@ -27,30 +27,14 @@ function findValueByLabel(grid: unknown[][], labelRegex: RegExp): number | null 
 
 function getAuth(scopes: string[]) {
   return SERVICE_ACCOUNT_JSON
-    ? new google.auth.GoogleAuth({
-        credentials: JSON.parse(SERVICE_ACCOUNT_JSON),
-        scopes,
-      })
-    : new google.auth.GoogleAuth({
-        keyFile: KEY_FILE,
-        scopes,
-      });
+    ? new google.auth.GoogleAuth({ credentials: JSON.parse(SERVICE_ACCOUNT_JSON), scopes })
+    : new google.auth.GoogleAuth({ keyFile: KEY_FILE, scopes });
 }
 
 function monthSort(tabs: string[]) {
   const map: Record<string, number> = {
-    JAN: 1,
-    FEB: 2,
-    MAR: 3,
-    APR: 4,
-    MAY: 5,
-    JUN: 6,
-    JUL: 7,
-    AUG: 8,
-    SEP: 9,
-    OCT: 10,
-    NOV: 11,
-    DEC: 12,
+    JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+    JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12,
   };
 
   return [...tabs].sort((a, b) => {
@@ -63,7 +47,6 @@ function monthSort(tabs: string[]) {
 
 export async function fetchDashboardData() {
   const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets.readonly"]);
-
   const sheets = google.sheets({ version: "v4", auth });
 
   const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
@@ -73,7 +56,7 @@ export async function fetchDashboardData() {
 
   const months = monthSort(tabs);
 
-  const summary = [] as Array<{
+  const summary: Array<{
     month: string;
     dailyAccount: number;
     income: number;
@@ -83,17 +66,32 @@ export async function fetchDashboardData() {
     growth: number;
     savings: number;
     debt: number;
-  }>;
+    owned: number;
+    crypto: number;
+    netWorth: number;
+  }> = [];
 
   for (const tab of months) {
-    const [daily, savings, debt, header, legacyTotals, v2Totals, topSummary] = await Promise.all([
+    const [
+      daily,
+      savingsCol,
+      debtCol,
+      ownedCol,
+      cryptoCol,
+      header,
+      legacyDebt,
+      v2Totals,
+      topSummary,
+    ] = await Promise.all([
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A11:F1000` }),
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!J11:J1000` }),
       sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!M11:M1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B2:B4`, valueRenderOption: 'UNFORMATTED_VALUE' }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!H2:H3`, valueRenderOption: 'UNFORMATTED_VALUE' }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B3:B4`, valueRenderOption: 'UNFORMATTED_VALUE' }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A1:N6`, valueRenderOption: 'UNFORMATTED_VALUE' }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!P11:P1000` }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!T11:T1000` }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B2:B4`, valueRenderOption: "UNFORMATTED_VALUE" }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!H2:H3`, valueRenderOption: "UNFORMATTED_VALUE" }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B3:B4`, valueRenderOption: "UNFORMATTED_VALUE" }),
+      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A1:T8`, valueRenderOption: "UNFORMATTED_VALUE" }),
     ]);
 
     let income = 0;
@@ -110,50 +108,61 @@ export async function fetchDashboardData() {
       else if (type === "investment") investment += amount;
     }
 
-    const savingsFromRows = (savings.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
-    const debtFromRows = (debt.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
+    const savingsFromRows = (savingsCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
+    const debtFromRows = (debtCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
+    const ownedFromRows = (ownedCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
+    const cryptoFromRows = (cryptoCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
 
-    const b2b4 = (header.data.values || []).flat().map(toNumber); // legacy: B2 daily, B3 savings
-    const h2h3 = (legacyTotals.data.values || []).flat().map(toNumber); // legacy debt area
-    const b3b4v2 = (v2Totals.data.values || []).flat().map(toNumber); // v2: B3 daily, B4 savings
+    const b2b4 = (header.data.values || []).flat().map(toNumber);
+    const h2h3 = (legacyDebt.data.values || []).flat().map(toNumber);
+    const b3b4v2 = (v2Totals.data.values || []).flat().map(toNumber);
     const topGrid = (topSummary.data.values || []) as unknown[][];
 
     const labelDaily = findValueByLabel(topGrid, /^daily\s*account$/i);
     const labelSavings = findValueByLabel(topGrid, /^savings\s*account$/i);
     const labelDebt = findValueByLabel(topGrid, /^debt$/i);
+    const labelOwned = findValueByLabel(topGrid, /^owned$/i);
     const labelMonthIn = findValueByLabel(topGrid, /^month\s*in$/i);
     const labelMonthOut = findValueByLabel(topGrid, /^month\s*out$/i);
+    const labelCryptoTotal = findValueByLabel(topGrid, /^total\s*crypto$/i);
 
     const dailyAccount = (labelDaily ?? b3b4v2[0] ?? b2b4[0] ?? 0) as number;
-
-    const savingsCandidates = [savingsFromRows, labelSavings, b3b4v2[1], b2b4[1]].filter((n) => Number.isFinite(n));
-    const savingsTotal = savingsCandidates.find((n) => Math.abs(Number(n)) > 0) ?? 0;
-
-    const debtCandidates = [debtFromRows, labelDebt, h2h3[0]].filter((n) => Number.isFinite(n));
-    const debtTotal = debtCandidates.find((n) => Math.abs(Number(n)) > 0) ?? 0;
+    const savings = [savingsFromRows, labelSavings, b3b4v2[1], b2b4[1]].find((n) => Number.isFinite(Number(n)) && Math.abs(Number(n)) > 0) ?? 0;
+    const debt = [debtFromRows, labelDebt, h2h3[0]].find((n) => Number.isFinite(Number(n)) && Math.abs(Number(n)) > 0) ?? 0;
+    const owned = [ownedFromRows, labelOwned].find((n) => Number.isFinite(Number(n)) && Math.abs(Number(n)) > 0) ?? 0;
+    const crypto = [cryptoFromRows, labelCryptoTotal].find((n) => Number.isFinite(Number(n)) && Math.abs(Number(n)) > 0) ?? 0;
 
     const incomeForDashboard = labelMonthIn ?? (income + roi);
     const expensesForDashboard = labelMonthOut ?? (expenses + investment);
     const growth = incomeForDashboard + expensesForDashboard;
 
+    const netWorth = dailyAccount + Number(savings) + Number(owned) - Number(debt) + Number(crypto);
+
     summary.push({
       month: tab,
       dailyAccount,
-      income: incomeForDashboard,
-      expenses: expensesForDashboard,
+      income: Number(incomeForDashboard),
+      expenses: Number(expensesForDashboard),
       roi,
       investment,
       growth,
-      savings: savingsTotal,
-      debt: debtTotal,
+      savings: Number(savings),
+      debt: Number(debt),
+      owned: Number(owned),
+      crypto: Number(crypto),
+      netWorth,
     });
   }
 
+  // Latest crypto holdings detail
+  const latestTab = summary[summary.length - 1]?.month || BASE_TAB;
+  const holdingsRes = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${latestTab}'!R11:T1000` });
+  const holdings = (holdingsRes.data.values || [])
+    .map((r) => ({ coin: String(r[0] || "").trim(), amount: toNumber(r[1]), euros: toNumber(r[2]) }))
+    .filter((r) => r.coin && (r.amount !== 0 || r.euros !== 0));
+
   const recent = summary.slice(-3);
-  const avg = (key: keyof (typeof summary)[number]) => {
-    if (!recent.length) return 0;
-    return recent.reduce((a, r) => a + Number(r[key] || 0), 0) / recent.length;
-  };
+  const avg = (key: keyof (typeof summary)[number]) => recent.length ? recent.reduce((a, r) => a + Number(r[key] || 0), 0) / recent.length : 0;
 
   const avgGrowth = avg("growth");
   const avgSavingsDelta = recent.length > 1 ? (recent[recent.length - 1].savings - recent[0].savings) / (recent.length - 1) : 0;
@@ -161,9 +170,7 @@ export async function fetchDashboardData() {
 
   const deltas = <T extends keyof (typeof summary)[number]>(key: T) => {
     const out: number[] = [];
-    for (let i = 1; i < summary.length; i++) {
-      out.push(Number(summary[i][key]) - Number(summary[i - 1][key]));
-    }
+    for (let i = 1; i < summary.length; i++) out.push(Number(summary[i][key]) - Number(summary[i - 1][key]));
     return out;
   };
   const std = (arr: number[]) => {
@@ -192,17 +199,16 @@ export async function fetchDashboardData() {
     projectedDebtLow: number;
     projectedDebtHigh: number;
   }> = [];
+
   if (last) {
     let mm = map[last.month.slice(0, 3)] || 1;
     let yy = Number(`20${last.month.slice(3)}`);
     let s = last.savings;
     let d = last.debt;
+
     for (let i = 1; i <= 3; i++) {
       mm += 1;
-      if (mm > 12) {
-        mm = 1;
-        yy += 1;
-      }
+      if (mm > 12) { mm = 1; yy += 1; }
       s += avgSavingsDelta;
       d += avgDebtDelta;
       forecasts.push({
@@ -222,6 +228,10 @@ export async function fetchDashboardData() {
 
   return {
     months: summary,
+    crypto: {
+      total: summary[summary.length - 1]?.crypto || 0,
+      holdings,
+    },
     forecast: {
       horizonMonths: 3,
       avgGrowth,

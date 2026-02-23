@@ -17,7 +17,7 @@ import {
   YAxis,
   ReferenceLine,
 } from "recharts";
-import { Wallet, PiggyBank, TrendingUp, Landmark } from "lucide-react";
+import { Wallet, PiggyBank, TrendingUp, Landmark, Coins } from "lucide-react";
 
 type Row = {
   month: string;
@@ -29,6 +29,9 @@ type Row = {
   growth: number;
   savings: number;
   debt: number;
+  owned: number;
+  crypto: number;
+  netWorth: number;
 };
 
 type ForecastPoint = {
@@ -44,9 +47,17 @@ type ForecastPoint = {
   projectedDebtHigh: number;
 };
 
+type Holding = {
+  coin: string;
+  amount: number;
+  euros: number;
+};
+
 export default function Home() {
   const [rows, setRows] = useState<Row[]>([]);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [cryptoTotal, setCryptoTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -69,9 +80,13 @@ export default function Home() {
       setError(json.error || "Failed to load dashboard data");
       setRows([]);
       setForecast([]);
+      setHoldings([]);
+      setCryptoTotal(0);
     } else {
       setRows(json.months || []);
       setForecast(json.forecast?.points || []);
+      setHoldings(json.crypto?.holdings || []);
+      setCryptoTotal(json.crypto?.total || 0);
     }
     setLoading(false);
   };
@@ -147,11 +162,12 @@ export default function Home() {
           <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300 text-sm">{error}</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Kpi icon={<Wallet size={16} />} label="Daily Account" value={latest?.dailyAccount ?? 0} />
               <Kpi icon={<PiggyBank size={16} />} label="Savings" value={latest?.savings ?? 0} />
               <Kpi icon={<Landmark size={16} />} label="Debt" value={latest?.debt ?? 0} />
-              <Kpi icon={<TrendingUp size={16} />} label="YTD Growth" value={rows.reduce((a, r) => a + r.growth, 0)} />
+              <Kpi icon={<Coins size={16} />} label="Crypto" value={cryptoTotal} />
+              <Kpi icon={<TrendingUp size={16} />} label="Net Worth" value={latest?.netWorth ?? 0} />
             </div>
 
             <Card title="Quick add transaction">
@@ -167,11 +183,7 @@ export default function Home() {
                     }}
                     required
                   />
-                  <button
-                    type="button"
-                    onClick={parsePrompt}
-                    className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-sm"
-                  >
+                  <button type="button" onClick={parsePrompt} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-sm">
                     Parse
                   </button>
                   <button disabled={saving} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 text-sm font-medium">
@@ -180,8 +192,9 @@ export default function Home() {
                 </div>
                 {parsed && (
                   <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
-                    <div>Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b> | Category: <b>{parsed.category || "General"}</b></div>
-                    {parsed.notes ? <div className="mt-1">Notes: {parsed.notes}</div> : null}
+                    <div>
+                      Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b> | Category: <b>{parsed.category || "General"}</b>
+                    </div>
                   </div>
                 )}
               </form>
@@ -204,7 +217,7 @@ export default function Home() {
               </ChartWrap>
             </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card title="Savings evolution">
                 <ChartWrap>
                   <ResponsiveContainer width="100%" height={260}>
@@ -232,14 +245,34 @@ export default function Home() {
                   </ResponsiveContainer>
                 </ChartWrap>
               </Card>
+
+              <Card title="Net worth evolution">
+                <ChartWrap>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={rows}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
+                      <XAxis dataKey="month" stroke="#a1a1aa" />
+                      <YAxis stroke="#a1a1aa" />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="netWorth" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartWrap>
+              </Card>
             </div>
 
-            <Card title="YTD quick totals">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <Badge label="Income" value={totals.income} color="text-green-400" />
-                <Badge label="Expenses" value={Math.abs(totals.expenses)} color="text-red-400" />
-                <Badge label="ROI" value={totals.roi} color="text-lime-400" />
-                <Badge label="Investment" value={Math.abs(totals.investment)} color="text-yellow-300" />
+            <Card title="Crypto portfolio">
+              <div className="mb-3 text-sm text-zinc-300">Total: <span className="font-semibold text-amber-300">€ {cryptoTotal.toLocaleString()}</span></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                {holdings.map((h) => (
+                  <div key={h.coin} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{h.coin}</div>
+                      <div className="text-zinc-400 text-xs">{h.amount.toLocaleString()}</div>
+                    </div>
+                    <div className="text-amber-300 font-semibold">€ {h.euros.toLocaleString()}</div>
+                  </div>
+                ))}
               </div>
             </Card>
 
@@ -257,7 +290,7 @@ export default function Home() {
                     <YAxis yAxisId="left" stroke="#a1a1aa" />
                     <YAxis yAxisId="right" orientation="right" stroke="#86efac" />
                     <ReferenceLine yAxisId="right" y={0} stroke="#3f3f46" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 12 }} labelStyle={{ color: '#d4d4d8' }} />
+                    <Tooltip contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 12 }} labelStyle={{ color: "#d4d4d8" }} />
                     <Legend />
                     <Area yAxisId="left" type="monotone" dataKey="projectedSavingsHigh" stroke="none" fill="#8b5cf640" name="Savings band (high)" />
                     <Area yAxisId="left" type="monotone" dataKey="projectedSavingsLow" stroke="none" fill="#8b5cf620" name="Savings band (low)" />
@@ -270,6 +303,15 @@ export default function Home() {
                 </ResponsiveContainer>
               </ChartWrap>
             </Card>
+
+            <Card title="YTD quick totals">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <Badge label="Income" value={totals.income} color="text-green-400" />
+                <Badge label="Expenses" value={Math.abs(totals.expenses)} color="text-red-400" />
+                <Badge label="ROI" value={totals.roi} color="text-lime-400" />
+                <Badge label="Investment" value={Math.abs(totals.investment)} color="text-yellow-300" />
+              </div>
+            </Card>
           </>
         )}
       </div>
@@ -279,11 +321,7 @@ export default function Home() {
 
 function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
-    >
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
       <div className="flex items-center gap-2 text-zinc-400 text-sm">{icon} {label}</div>
       <div className="mt-2 text-2xl font-semibold">€ {value.toLocaleString()}</div>
     </motion.div>
@@ -292,11 +330,7 @@ function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: nu
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
-    >
+    <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
       <h2 className="mb-3 text-sm text-zinc-400">{title}</h2>
       {children}
     </motion.section>
