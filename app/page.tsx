@@ -50,14 +50,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    date: "",
-    concept: "",
-    amount: "",
-    type: "Expense",
-    category: "General",
-    notes: "",
-  });
+  const [prompt, setPrompt] = useState("");
+  const [parsed, setParsed] = useState<{
+    date?: string;
+    concept: string;
+    amount: number;
+    type: "Income" | "Expense" | "ROI" | "Investment" | "Balance";
+    category?: string;
+    notes?: string;
+  } | null>(null);
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -79,23 +80,42 @@ export default function Home() {
     loadDashboard();
   }, []);
 
+  const parsePrompt = async () => {
+    setError(null);
+    const res = await fetch("/api/transaction/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setParsed(null);
+      setError(json.error || "Could not parse transaction text");
+      return;
+    }
+    setParsed(json.parsed);
+  };
+
   const submitQuickAdd = async (e: FormEvent) => {
     e.preventDefault();
+    if (!parsed) {
+      await parsePrompt();
+      return;
+    }
+
     setSaving(true);
     setError(null);
     const res = await fetch("/api/transaction", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        amount: Number(form.amount),
-      }),
+      body: JSON.stringify(parsed),
     });
     const json = await res.json();
     if (!res.ok) {
       setError(json.error || "Failed to add transaction");
     } else {
-      setForm({ date: "", concept: "", amount: "", type: "Expense", category: "General", notes: "" });
+      setPrompt("");
+      setParsed(null);
       await loadDashboard();
     }
     setSaving(false);
@@ -135,20 +155,35 @@ export default function Home() {
             </div>
 
             <Card title="Quick add transaction">
-              <form onSubmit={submitQuickAdd} className="grid grid-cols-1 md:grid-cols-6 gap-2">
-                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Date (MM/DD/YYYY)" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Concept" value={form.concept} onChange={(e) => setForm({ ...form, concept: e.target.value })} required />
-                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Amount" type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
-                <select className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option>Expense</option>
-                  <option>Income</option>
-                  <option>ROI</option>
-                  <option>Investment</option>
-                  <option>Balance</option>
-                </select>
-                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-                <button disabled={saving} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 text-sm font-medium">{saving ? "Adding..." : "Add"}</button>
-                <input className="md:col-span-6 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <form onSubmit={submitQuickAdd} className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
+                    placeholder='Try: "spent 24.9 on groceries" or "earned 2200 from salary"'
+                    value={prompt}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                      setParsed(null);
+                    }}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={parsePrompt}
+                    className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-4 py-2 text-sm"
+                  >
+                    Parse
+                  </button>
+                  <button disabled={saving} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 text-sm font-medium">
+                    {saving ? "Adding..." : parsed ? "Confirm & Add" : "Add"}
+                  </button>
+                </div>
+                {parsed && (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
+                    <div>Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b> | Category: <b>{parsed.category || "General"}</b></div>
+                    {parsed.notes ? <div className="mt-1">Notes: {parsed.notes}</div> : null}
+                  </div>
+                )}
               </form>
             </Card>
 
