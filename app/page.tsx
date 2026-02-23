@@ -182,7 +182,7 @@ export default function Home() {
               <form onSubmit={submitQuickAdd} className="space-y-2">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm"
+                    className="flex-1 rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm"
                     placeholder='Try: "spent 24.9 on groceries" or "earned 2200 from salary"'
                     value={prompt}
                     onChange={(e) => {
@@ -199,7 +199,7 @@ export default function Home() {
                   </button>
                 </div>
                 {parsed && (
-                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-300">
+                  <div className="rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-zinc-200">
                     <div>
                       Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b> | Category: <b>{parsed.category || "General"}</b>
                     </div>
@@ -215,11 +215,15 @@ export default function Home() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                     <XAxis dataKey="month" stroke="#a1a1aa" />
                     <YAxis stroke="#a1a1aa" />
-                    <Tooltip />
-                    <Bar dataKey="income" fill="#22c55e" />
-                    <Bar dataKey="expenses" fill="#ef4444" />
-                    <Bar dataKey="roi" fill="#84cc16" />
-                    <Bar dataKey="investment" fill="#eab308" />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.06)" }}
+                      contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                      labelStyle={{ color: "#d8d4fe" }}
+                    />
+                    <Bar dataKey="income" fill="#22d3ee" />
+                    <Bar dataKey="expenses" fill="#ff4d8d" />
+                    <Bar dataKey="roi" fill="#a3e635" />
+                    <Bar dataKey="investment" fill="#fbbf24" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartWrap>
@@ -233,8 +237,12 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                       <XAxis dataKey="month" stroke="#a1a1aa" />
                       <YAxis stroke="#a1a1aa" />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="savings" stroke="#a78bfa" strokeWidth={3} dot={false} />
+                      <Tooltip
+                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        labelStyle={{ color: "#d8d4fe" }}
+                      />
+                      <Line type="monotone" dataKey="savings" stroke="#22d3ee" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -247,8 +255,12 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                       <XAxis dataKey="month" stroke="#a1a1aa" />
                       <YAxis stroke="#a1a1aa" />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="debt" stroke="#f87171" strokeWidth={3} dot={false} />
+                      <Tooltip
+                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        labelStyle={{ color: "#d8d4fe" }}
+                      />
+                      <Line type="monotone" dataKey="debt" stroke="#ff4d8d" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -261,8 +273,12 @@ export default function Home() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                       <XAxis dataKey="month" stroke="#a1a1aa" />
                       <YAxis stroke="#a1a1aa" />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="netWorth" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                      <Tooltip
+                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        labelStyle={{ color: "#d8d4fe" }}
+                      />
+                      <Line type="monotone" dataKey="netWorth" stroke="#8b5cf6" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -286,9 +302,9 @@ export default function Home() {
 
             <Card title="3-month forecast (with confidence bands)">
               <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Purple/red shaded zones = confidence bands</div>
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Savings should trend up, debt should trend down</div>
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Growth shown on right axis</div>
+                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Purple/red shaded zones = confidence bands</div>
+                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Savings should trend up, debt should trend down</div>
+                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Growth shown on right axis</div>
               </div>
               <ChartWrap>
                 <ResponsiveContainer width="100%" height={280}>
@@ -359,7 +375,7 @@ function ChartWrap({ children }: { children: ReactNode }) {
 
 function Badge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-xl border border-cyan-300/15 bg-[#1b1046] p-3">
+    <div className="rounded-xl border border-white/15 bg-white/5 p-3">
       <div className="text-zinc-300">{label}</div>
       <div className={`font-semibold ${color}`}>€ {value.toLocaleString()}</div>
     </div>

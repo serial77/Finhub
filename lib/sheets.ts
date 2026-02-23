@@ -90,21 +90,23 @@ export async function fetchDashboardData() {
       savingsCol,
       debtCol,
       ownedCol,
-      cryptoCol,
+      cryptoTable,
       header,
       legacyDebt,
       v2Totals,
       topSummary,
+      netWorthCell,
     ] = await Promise.all([
       safeGet(`'${tab}'!A11:F1000`),
       safeGet(`'${tab}'!J11:J1000`),
       safeGet(`'${tab}'!M11:M1000`),
       safeGet(`'${tab}'!P11:P1000`),
-      safeGet(`'${tab}'!T11:T1000`),
+      safeGet(`'${tab}'!R11:T1000`),
       safeGet(`'${tab}'!B2:B4`, "UNFORMATTED_VALUE"),
       safeGet(`'${tab}'!H2:H3`, "UNFORMATTED_VALUE"),
       safeGet(`'${tab}'!B3:B4`, "UNFORMATTED_VALUE"),
       safeGet(`'${tab}'!A1:T8`, "UNFORMATTED_VALUE"),
+      safeGet(`'${tab}'!B7:B7`, "UNFORMATTED_VALUE"),
     ]);
 
     let income = 0;
@@ -124,7 +126,13 @@ export async function fetchDashboardData() {
     const savingsFromRows = (savingsCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
     const debtFromRows = (debtCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
     const ownedFromRows = (ownedCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
-    const cryptoFromRows = (cryptoCol.data.values || []).reduce((acc, r) => acc + toNumber(r[0]), 0);
+    const cryptoFromRows = (cryptoTable.data.values || [])
+      .filter((r) => {
+        const coin = String(r[0] || "").trim();
+        if (!coin) return false;
+        return !/total\s*crypto/i.test(coin);
+      })
+      .reduce((acc, r) => acc + toNumber(r[2]), 0);
 
     const b2b4 = (header.data.values || []).flat().map(toNumber);
     const h2h3 = (legacyDebt.data.values || []).flat().map(toNumber);
@@ -138,6 +146,7 @@ export async function fetchDashboardData() {
     const labelMonthIn = findValueByLabel(topGrid, /^month\s*in$/i);
     const labelMonthOut = findValueByLabel(topGrid, /^month\s*out$/i);
     const labelCryptoTotal = findValueByLabel(topGrid, /^total\s*crypto$/i);
+    const sheetNetWorth = toNumber((netWorthCell.data.values?.[0] || [0])[0]);
 
     const dailyAccount = (labelDaily ?? b3b4v2[0] ?? b2b4[0] ?? 0) as number;
     const savings = [savingsFromRows, labelSavings, b3b4v2[1], b2b4[1]].find((n) => Number.isFinite(Number(n)) && Math.abs(Number(n)) > 0) ?? 0;
@@ -149,7 +158,7 @@ export async function fetchDashboardData() {
     const expensesForDashboard = labelMonthOut ?? (expenses + investment);
     const growth = incomeForDashboard + expensesForDashboard;
 
-    const netWorth = dailyAccount + Number(savings) + Number(owned) - Number(debt) + Number(crypto);
+    const netWorth = sheetNetWorth || (dailyAccount + Number(savings) + Number(owned) - Number(debt) + Number(crypto));
 
     summary.push({
       month: tab,
