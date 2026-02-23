@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import {
+  Area,
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -32,8 +34,14 @@ type Row = {
 type ForecastPoint = {
   month: string;
   projectedGrowth: number;
+  projectedGrowthLow: number;
+  projectedGrowthHigh: number;
   projectedSavings: number;
+  projectedSavingsLow: number;
+  projectedSavingsHigh: number;
   projectedDebt: number;
+  projectedDebtLow: number;
+  projectedDebtHigh: number;
 };
 
 export default function Home() {
@@ -41,25 +49,57 @@ export default function Home() {
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    date: "",
+    concept: "",
+    amount: "",
+    type: "Expense",
+    category: "General",
+    notes: "",
+  });
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    setError(null);
+    const res = await fetch("/api/dashboard", { cache: "no-store" });
+    const json = await res.json();
+    if (!res.ok) {
+      setError(json.error || "Failed to load dashboard data");
+      setRows([]);
+      setForecast([]);
+    } else {
+      setRows(json.months || []);
+      setForecast(json.forecast?.points || []);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const run = async () => {
-      setLoading(true);
-      setError(null);
-      const res = await fetch("/api/dashboard", { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Failed to load dashboard data");
-        setRows([]);
-        setForecast([]);
-      } else {
-        setRows(json.months || []);
-        setForecast(json.forecast?.points || []);
-      }
-      setLoading(false);
-    };
-    run();
+    loadDashboard();
   }, []);
+
+  const submitQuickAdd = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/transaction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...form,
+        amount: Number(form.amount),
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setError(json.error || "Failed to add transaction");
+    } else {
+      setForm({ date: "", concept: "", amount: "", type: "Expense", category: "General", notes: "" });
+      await loadDashboard();
+    }
+    setSaving(false);
+  };
 
   const latest = rows[rows.length - 1];
   const totals = useMemo(() => {
@@ -93,6 +133,24 @@ export default function Home() {
               <Kpi icon={<Landmark size={16} />} label="Debt" value={latest?.debt ?? 0} />
               <Kpi icon={<TrendingUp size={16} />} label="YTD Growth" value={rows.reduce((a, r) => a + r.growth, 0)} />
             </div>
+
+            <Card title="Quick add transaction">
+              <form onSubmit={submitQuickAdd} className="grid grid-cols-1 md:grid-cols-6 gap-2">
+                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Date (MM/DD/YYYY)" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Concept" value={form.concept} onChange={(e) => setForm({ ...form, concept: e.target.value })} required />
+                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Amount" type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required />
+                <select className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                  <option>Expense</option>
+                  <option>Income</option>
+                  <option>ROI</option>
+                  <option>Investment</option>
+                  <option>Balance</option>
+                </select>
+                <input className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+                <button disabled={saving} className="rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 px-4 py-2 text-sm font-medium">{saving ? "Adding..." : "Add"}</button>
+                <input className="md:col-span-6 rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm" placeholder="Notes (optional)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </form>
+            </Card>
 
             <Card title="Monthly totals (Income / Expenses / ROI / Investment)">
               <ChartWrap>
@@ -150,29 +208,30 @@ export default function Home() {
               </div>
             </Card>
 
-            <Card title="3-month forecast (moving-average)">
+            <Card title="3-month forecast (with confidence bands)">
               <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Savings trend <span className="text-violet-300">(target up)</span></div>
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Debt trend <span className="text-rose-300">(target down)</span></div>
-                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Growth trend <span className="text-emerald-300">(secondary axis)</span></div>
+                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Purple/red shaded zones = confidence bands</div>
+                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Savings should trend up, debt should trend down</div>
+                <div className="rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-zinc-300">Growth shown on right axis</div>
               </div>
               <ChartWrap>
                 <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={forecast} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
+                  <ComposedChart data={forecast} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                     <XAxis dataKey="month" stroke="#a1a1aa" />
                     <YAxis yAxisId="left" stroke="#a1a1aa" />
                     <YAxis yAxisId="right" orientation="right" stroke="#86efac" />
                     <ReferenceLine yAxisId="right" y={0} stroke="#3f3f46" strokeDasharray="4 4" />
-                    <Tooltip
-                      contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 12 }}
-                      labelStyle={{ color: '#d4d4d8' }}
-                    />
+                    <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 12 }} labelStyle={{ color: '#d4d4d8' }} />
                     <Legend />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsHigh" stroke="none" fill="#8b5cf640" name="Savings band (high)" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsLow" stroke="none" fill="#8b5cf620" name="Savings band (low)" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtHigh" stroke="none" fill="#fb718540" name="Debt band (high)" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtLow" stroke="none" fill="#fb718520" name="Debt band (low)" />
                     <Line yAxisId="left" type="monotone" dataKey="projectedSavings" name="Projected Savings" stroke="#a78bfa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                     <Line yAxisId="left" type="monotone" dataKey="projectedDebt" name="Projected Debt" stroke="#fb7185" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                     <Line yAxisId="right" type="monotone" dataKey="projectedGrowth" name="Projected Growth" stroke="#22c55e" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                  </LineChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </ChartWrap>
             </Card>

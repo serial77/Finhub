@@ -3,6 +3,7 @@ import { google } from "googleapis";
 const SHEET_ID = process.env.GOOGLE_SHEET_ID!;
 const KEY_FILE = process.env.GOOGLE_APPLICATION_CREDENTIALS || "../secrets/google-service-account.json";
 const SERVICE_ACCOUNT_JSON = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+const BASE_TAB = process.env.FINANCE_TAB || "FEB26";
 
 function toNumber(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -22,6 +23,18 @@ function findValueByLabel(grid: unknown[][], labelRegex: RegExp): number | null 
     }
   }
   return null;
+}
+
+function getAuth(scopes: string[]) {
+  return SERVICE_ACCOUNT_JSON
+    ? new google.auth.GoogleAuth({
+        credentials: JSON.parse(SERVICE_ACCOUNT_JSON),
+        scopes,
+      })
+    : new google.auth.GoogleAuth({
+        keyFile: KEY_FILE,
+        scopes,
+      });
 }
 
 function monthSort(tabs: string[]) {
@@ -49,15 +62,7 @@ function monthSort(tabs: string[]) {
 }
 
 export async function fetchDashboardData() {
-  const auth = SERVICE_ACCOUNT_JSON
-    ? new google.auth.GoogleAuth({
-        credentials: JSON.parse(SERVICE_ACCOUNT_JSON),
-        scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-      })
-    : new google.auth.GoogleAuth({
-        keyFile: KEY_FILE,
-        scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-      });
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets.readonly"]);
 
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -154,11 +159,39 @@ export async function fetchDashboardData() {
   const avgSavingsDelta = recent.length > 1 ? (recent[recent.length - 1].savings - recent[0].savings) / (recent.length - 1) : 0;
   const avgDebtDelta = recent.length > 1 ? (recent[recent.length - 1].debt - recent[0].debt) / (recent.length - 1) : 0;
 
+  const deltas = <T extends keyof (typeof summary)[number]>(key: T) => {
+    const out: number[] = [];
+    for (let i = 1; i < summary.length; i++) {
+      out.push(Number(summary[i][key]) - Number(summary[i - 1][key]));
+    }
+    return out;
+  };
+  const std = (arr: number[]) => {
+    if (!arr.length) return 0;
+    const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(arr.reduce((a, b) => a + (b - m) ** 2, 0) / arr.length);
+  };
+
+  const growthStd = std(deltas("growth"));
+  const savingsStd = std(deltas("savings"));
+  const debtStd = std(deltas("debt"));
+
   const map: Record<string, number> = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
   const rev = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
   const last = summary[summary.length - 1];
-  const forecasts: Array<{ month: string; projectedGrowth: number; projectedSavings: number; projectedDebt: number }> = [];
+  const forecasts: Array<{
+    month: string;
+    projectedGrowth: number;
+    projectedGrowthLow: number;
+    projectedGrowthHigh: number;
+    projectedSavings: number;
+    projectedSavingsLow: number;
+    projectedSavingsHigh: number;
+    projectedDebt: number;
+    projectedDebtLow: number;
+    projectedDebtHigh: number;
+  }> = [];
   if (last) {
     let mm = map[last.month.slice(0, 3)] || 1;
     let yy = Number(`20${last.month.slice(3)}`);
@@ -175,8 +208,14 @@ export async function fetchDashboardData() {
       forecasts.push({
         month: `${rev[mm - 1]}${String(yy).slice(-2)}`,
         projectedGrowth: avgGrowth,
+        projectedGrowthLow: avgGrowth - growthStd,
+        projectedGrowthHigh: avgGrowth + growthStd,
         projectedSavings: s,
+        projectedSavingsLow: s - savingsStd,
+        projectedSavingsHigh: s + savingsStd,
         projectedDebt: d,
+        projectedDebtLow: d - debtStd,
+        projectedDebtHigh: d + debtStd,
       });
     }
   }
@@ -191,4 +230,55 @@ export async function fetchDashboardData() {
       points: forecasts,
     },
   };
+}
+
+function currentMonthTabName(d = new Date()) {
+  const mons = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  return `${mons[d.getMonth()]}${String(d.getFullYear()).slice(-2)}`;
+}
+
+async function resolveWriteTab(sheets: ReturnType<typeof google.sheets>) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+  const tabs = new Set((meta.data.sheets || []).map((s) => s.properties?.title || ""));
+  const now = currentMonthTabName();
+  if (tabs.has(now)) return now;
+  if (tabs.has(BASE_TAB)) return BASE_TAB;
+  const monthTabs = monthSort([...tabs].filter((t) => /^[A-Z]{3}\d{2}$/.test(t)));
+  return monthTabs[monthTabs.length - 1] || BASE_TAB;
+}
+
+export async function appendTransaction(input: {
+  date: string;
+  concept: string;
+  amount: number;
+  type: "Income" | "Expense" | "ROI" | "Investment" | "Balance";
+  category?: string;
+  notes?: string;
+}) {
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets"]);
+  const sheets = google.sheets({ version: "v4", auth });
+  const tab = await resolveWriteTab(sheets);
+
+  const amount = input.type === "Expense" || input.type === "Investment"
+    ? -Math.abs(input.amount)
+    : Math.abs(input.amount);
+
+  const row = [
+    input.date,
+    input.concept,
+    amount,
+    input.type,
+    input.category || "General",
+    input.notes || "",
+  ];
+
+  const res = await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `'${tab}'!A:F`,
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: [row] },
+  });
+
+  return { tab, updatedRange: res.data.updates?.updatedRange, row };
 }
