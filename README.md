@@ -20,8 +20,11 @@ Create `.env.local` from `.env.example` and set:
 
 ## Security
 
-This app is protected with HTTP Basic Auth via `middleware.ts`.
-Any request to `/` or `/api/*` requires credentials.
+This app is protected with a login page + secure session cookie via `middleware.ts`.
+Any request (except `/login` and `/api/auth/login`) requires a valid session.
+
+Add this env var too:
+- `DASHBOARD_SESSION_SECRET` (random long string)
 
 ## Deploy (Vercel)
 
