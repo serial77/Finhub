@@ -67,7 +67,9 @@ function monthSort(tabs: string[]) {
   });
 }
 
-export async function fetchDashboardData() {
+let dashboardCache: { at: number; data: Awaited<ReturnType<typeof fetchDashboardDataUncached>> } | null = null;
+
+async function fetchDashboardDataUncached() {
   const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets.readonly"]);
   const sheets = google.sheets({ version: "v4", auth });
 
@@ -316,6 +318,17 @@ export async function fetchDashboardData() {
   };
 }
 
+export async function fetchDashboardData(force = false) {
+  const now = Date.now();
+  if (!force && dashboardCache && now - dashboardCache.at < 60000) {
+    return dashboardCache.data;
+  }
+
+  const data = await fetchDashboardDataUncached();
+  dashboardCache = { at: now, data };
+  return data;
+}
+
 function currentMonthTabName(d = new Date()) {
   const mons = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
   return `${mons[d.getMonth()]}${String(d.getFullYear()).slice(-2)}`;
@@ -366,6 +379,7 @@ export async function appendTransaction(input: TxInput) {
     requestBody: { values: [row] },
   });
 
+  dashboardCache = null;
   return { tab, updatedRange: res.data.updates?.updatedRange, row };
 }
 
@@ -442,6 +456,7 @@ export async function undoKristinaMovement(rowNumber: number) {
 
   await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: rowRange });
   kristinaCache = null;
+  dashboardCache = null;
   return { ok: true, tab, rowNumber };
 }
 
@@ -504,5 +519,6 @@ export async function appendKrisMovement(input: { date: string; action: string; 
     requestBody: { values: [row] },
   });
 
+  dashboardCache = null;
   return { updatedRange: res.data.updates?.updatedRange, row, pending: newOwned };
 }
