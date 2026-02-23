@@ -8,7 +8,6 @@ import {
   BarChart,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -60,6 +59,8 @@ type Movement = {
   type: string;
   category: string;
 };
+
+const shortMonth = (v: string | number) => String(v || "").slice(0, 3);
 
 export default function Home() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -162,11 +163,15 @@ export default function Home() {
   }, [rows]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-cyan-500 via-sky-600 to-fuchsia-700 text-zinc-100 p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-6 rounded-3xl border border-cyan-300/20 bg-[#1a1040]/85 backdrop-blur-md p-5 md:p-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-        <div className="flex items-center justify-between rounded-2xl border border-fuchsia-300/20 bg-[#221257]/70 px-4 py-3">
+    <main className="min-h-screen bg-gradient-to-br from-[#070f2c] via-[#081b4a] to-[#0a2b66] text-zinc-100 p-6 md:p-10 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "repeating-linear-gradient(0deg, #7dd3fc 0px, #7dd3fc 1px, transparent 1px, transparent 3px)" }} />
+      <div className="pointer-events-none absolute -top-32 -left-24 w-80 h-80 rounded-full bg-cyan-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-emerald-400/15 blur-3xl" />
+
+      <div className="max-w-7xl mx-auto space-y-6 rounded-3xl border border-cyan-300/20 bg-[#07163f]/88 backdrop-blur-md p-5 md:p-7 shadow-[0_20px_80px_rgba(0,0,0,0.45),inset_0_0_40px_rgba(34,211,238,0.06)] relative">
+        <div className="flex items-center justify-between rounded-2xl border border-fuchsia-300/20 bg-[#0b255f]/72 px-4 py-3">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">Finance Motion Dashboard</h1>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-emerald-300 bg-clip-text text-transparent">Finance Motion Dashboard</h1>
             <p className="text-zinc-300 text-sm">Live from Google Sheets</p>
           </div>
           <div className="hidden md:flex items-center gap-2 text-xs text-zinc-300">
@@ -231,10 +236,10 @@ export default function Home() {
                       contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
                       labelStyle={{ color: "#d8d4fe" }}
                     />
-                    <Bar dataKey="income" fill="#22d3ee" />
-                    <Bar dataKey="expenses" fill="#ff4d8d" />
-                    <Bar dataKey="roi" fill="#a3e635" />
-                    <Bar dataKey="investment" fill="#fbbf24" />
+                    <Bar dataKey="income" fill="#00d5ff" />
+                    <Bar dataKey="expenses" fill="#ff4b4b" />
+                    <Bar dataKey="roi" fill="#39ff88" />
+                    <Bar dataKey="investment" fill="#ffe600" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartWrap>
@@ -253,7 +258,7 @@ export default function Home() {
                         contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
-                      <Line type="monotone" dataKey="savings" stroke="#22d3ee" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="savings" stroke="#00d5ff" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -271,7 +276,7 @@ export default function Home() {
                         contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
-                      <Line type="monotone" dataKey="debt" stroke="#ff4d8d" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="debt" stroke="#ff4b4b" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -289,7 +294,7 @@ export default function Home() {
                         contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
-                      <Line type="monotone" dataKey="netWorth" stroke="#8b5cf6" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="netWorth" stroke="#b06cff" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartWrap>
@@ -323,7 +328,7 @@ export default function Home() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
                     <XAxis dataKey="month" stroke="#a1a1aa" />
                     <YAxis yAxisId="left" stroke="#a1a1aa" />
-                    <YAxis yAxisId="right" orientation="right" stroke="#86efac" />
+                    <YAxis yAxisId="right" orientation="right" stroke="#39ff88" />
                     <ReferenceLine yAxisId="right" y={0} stroke="#3f3f46" strokeDasharray="4 4" />
                     <Tooltip contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 12 }} labelStyle={{ color: "#d4d4d8" }} />
                     <Legend />
@@ -336,7 +341,7 @@ export default function Home() {
                     <Line yAxisId="right" type="monotone" dataKey="projectedGrowth" name="Projected Growth" stroke="#22c55e" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2 }} activeDot={{ r: 4 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </ChartWrap>
+              </div>
             </Card>
 
             <Card title="Last 5 daily movements">
@@ -344,15 +349,16 @@ export default function Home() {
                 {movements.map((m, idx) => {
                   const meta = movementMeta(m.type);
                   return (
-                    <div key={`${m.date}-${m.concept}-${idx}`} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={`${m.date}-${m.concept}-${idx}`} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0 text-sm text-zinc-100">
                         <span className={`${meta.color}`}>{meta.icon}</span>
-                        <div className="min-w-0">
-                          <div className="text-sm text-zinc-100 truncate">{m.concept}</div>
-                          <div className="text-xs text-zinc-400">{m.date} • {m.type}</div>
-                        </div>
+                        <span className="truncate">{m.concept}</span>
+                        <span className="text-zinc-400">•</span>
+                        <span className="text-zinc-400 whitespace-nowrap">{m.date}</span>
+                        <span className="text-zinc-400">•</span>
+                        <span className="text-zinc-300 whitespace-nowrap">{m.type}</span>
                       </div>
-                      <div className={`text-sm font-semibold ${meta.amountColor}`}>€ {m.amount.toLocaleString()}</div>
+                      <div className={`text-sm font-semibold whitespace-nowrap ${meta.amountColor}`}>€ {m.amount.toLocaleString()}</div>
                     </div>
                   );
                 })}
@@ -389,7 +395,7 @@ function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: nu
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-fuchsia-500/20 to-cyan-500/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+      className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-[#0b3a78]/45 to-[#0f5b8f]/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
     >
       <div className="flex items-center gap-2 text-zinc-300 text-sm">{icon} {label}</div>
       <div className="mt-2 text-2xl font-semibold text-white">€ {value.toLocaleString()}</div>
@@ -402,8 +408,9 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
     <motion.section
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-fuchsia-300/20 bg-[#24145f]/80 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+      className="rounded-2xl border border-cyan-300/20 bg-[#0a1f54]/82 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35),inset_0_0_20px_rgba(0,213,255,0.05)] relative overflow-hidden"
     >
+      <div className="pointer-events-none absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "linear-gradient(90deg, rgba(34,211,238,0.35) 1px, transparent 1px), linear-gradient(0deg, rgba(34,211,238,0.25) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
       <h2 className="mb-3 text-sm text-cyan-200/90">{title}</h2>
       {children}
     </motion.section>
