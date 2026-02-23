@@ -151,10 +151,18 @@ export default function Home() {
   }, [rows]);
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold">Finance Motion Dashboard</h1>
-        <p className="text-zinc-400">Live from Google Sheets</p>
+    <main className="min-h-screen bg-gradient-to-br from-cyan-500 via-sky-600 to-fuchsia-700 text-zinc-100 p-6 md:p-10">
+      <div className="max-w-7xl mx-auto space-y-6 rounded-3xl border border-cyan-300/20 bg-[#1a1040]/85 backdrop-blur-md p-5 md:p-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
+        <div className="flex items-center justify-between rounded-2xl border border-fuchsia-300/20 bg-[#221257]/70 px-4 py-3">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-fuchsia-300 bg-clip-text text-transparent">Finance Motion Dashboard</h1>
+            <p className="text-zinc-300 text-sm">Live from Google Sheets</p>
+          </div>
+          <div className="hidden md:flex items-center gap-2 text-xs text-zinc-300">
+            <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-300/20">stats</span>
+            <span className="px-3 py-1 rounded-full bg-fuchsia-500/20 border border-fuchsia-300/20">crypto</span>
+          </div>
+        </div>
 
         {loading ? (
           <div className="text-zinc-400">Loading…</div>
@@ -321,17 +329,25 @@ export default function Home() {
 
 function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <div className="flex items-center gap-2 text-zinc-400 text-sm">{icon} {label}</div>
-      <div className="mt-2 text-2xl font-semibold">€ {value.toLocaleString()}</div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-fuchsia-500/20 to-cyan-500/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+    >
+      <div className="flex items-center gap-2 text-zinc-300 text-sm">{icon} {label}</div>
+      <div className="mt-2 text-2xl font-semibold text-white">€ {value.toLocaleString()}</div>
     </motion.div>
   );
 }
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <h2 className="mb-3 text-sm text-zinc-400">{title}</h2>
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-fuchsia-300/20 bg-[#24145f]/80 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35)]"
+    >
+      <h2 className="mb-3 text-sm text-cyan-200/90">{title}</h2>
       {children}
     </motion.section>
   );
@@ -343,8 +359,8 @@ function ChartWrap({ children }: { children: ReactNode }) {
 
 function Badge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="text-zinc-400">{label}</div>
+    <div className="rounded-xl border border-cyan-300/15 bg-[#1b1046] p-3">
+      <div className="text-zinc-300">{label}</div>
       <div className={`font-semibold ${color}`}>€ {value.toLocaleString()}</div>
     </div>
   );

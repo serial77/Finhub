@@ -71,6 +71,14 @@ export async function fetchDashboardData() {
     netWorth: number;
   }> = [];
 
+  async function safeGet(range: string, valueRenderOption?: "UNFORMATTED_VALUE") {
+    try {
+      return await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range, ...(valueRenderOption ? { valueRenderOption } : {}) });
+    } catch {
+      return { data: { values: [] as unknown[][] } } as Awaited<ReturnType<typeof sheets.spreadsheets.values.get>>;
+    }
+  }
+
   for (const tab of months) {
     const [
       daily,
@@ -83,15 +91,15 @@ export async function fetchDashboardData() {
       v2Totals,
       topSummary,
     ] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A11:F1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!J11:J1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!M11:M1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!P11:P1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!T11:T1000` }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B2:B4`, valueRenderOption: "UNFORMATTED_VALUE" }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!H2:H3`, valueRenderOption: "UNFORMATTED_VALUE" }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B3:B4`, valueRenderOption: "UNFORMATTED_VALUE" }),
-      sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A1:T8`, valueRenderOption: "UNFORMATTED_VALUE" }),
+      safeGet(`'${tab}'!A11:F1000`),
+      safeGet(`'${tab}'!J11:J1000`),
+      safeGet(`'${tab}'!M11:M1000`),
+      safeGet(`'${tab}'!P11:P1000`),
+      safeGet(`'${tab}'!T11:T1000`),
+      safeGet(`'${tab}'!B2:B4`, "UNFORMATTED_VALUE"),
+      safeGet(`'${tab}'!H2:H3`, "UNFORMATTED_VALUE"),
+      safeGet(`'${tab}'!B3:B4`, "UNFORMATTED_VALUE"),
+      safeGet(`'${tab}'!A1:T8`, "UNFORMATTED_VALUE"),
     ]);
 
     let income = 0;
@@ -156,7 +164,13 @@ export async function fetchDashboardData() {
 
   // Latest crypto holdings detail
   const latestTab = summary[summary.length - 1]?.month || BASE_TAB;
-  const holdingsRes = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${latestTab}'!R11:T1000` });
+  const holdingsRes = await (async () => {
+    try {
+      return await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${latestTab}'!R11:T1000` });
+    } catch {
+      return { data: { values: [] as unknown[][] } } as Awaited<ReturnType<typeof sheets.spreadsheets.values.get>>;
+    }
+  })();
   const holdings = (holdingsRes.data.values || [])
     .map((r) => ({ coin: String(r[0] || "").trim(), amount: toNumber(r[1]), euros: toNumber(r[2]) }))
     .filter((r) => r.coin && (r.amount !== 0 || r.euros !== 0));
