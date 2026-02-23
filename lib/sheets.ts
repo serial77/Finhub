@@ -71,11 +71,16 @@ export async function fetchDashboardData() {
     netWorth: number;
   }> = [];
 
-  async function safeGet(range: string, valueRenderOption?: "UNFORMATTED_VALUE") {
+  async function safeGet(range: string, valueRenderOption?: "UNFORMATTED_VALUE"): Promise<{ data: { values: unknown[][] } }> {
     try {
-      return await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range, ...(valueRenderOption ? { valueRenderOption } : {}) });
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range,
+        ...(valueRenderOption ? { valueRenderOption } : {}),
+      });
+      return { data: { values: (res.data.values || []) as unknown[][] } };
     } catch {
-      return { data: { values: [] as unknown[][] } } as Awaited<ReturnType<typeof sheets.spreadsheets.values.get>>;
+      return { data: { values: [] } };
     }
   }
 
@@ -164,11 +169,12 @@ export async function fetchDashboardData() {
 
   // Latest crypto holdings detail
   const latestTab = summary[summary.length - 1]?.month || BASE_TAB;
-  const holdingsRes = await (async () => {
+  const holdingsRes: { data: { values: unknown[][] } } = await (async () => {
     try {
-      return await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${latestTab}'!R11:T1000` });
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${latestTab}'!R11:T1000` });
+      return { data: { values: (res.data.values || []) as unknown[][] } };
     } catch {
-      return { data: { values: [] as unknown[][] } } as Awaited<ReturnType<typeof sheets.spreadsheets.values.get>>;
+      return { data: { values: [] } };
     }
   })();
   const holdings = (holdingsRes.data.values || [])
