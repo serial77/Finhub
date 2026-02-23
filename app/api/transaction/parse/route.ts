@@ -9,13 +9,42 @@ type Parsed = {
   notes?: string;
 };
 
+type KrisParsed = {
+  target: "kris";
+  date?: string;
+  action: string;
+  weight?: number;
+  value: number;
+};
+
 function todayMMDDYYYY() {
   const d = new Date();
   return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 }
 
-function parseNatural(input: string): Parsed {
+function parseNatural(input: string): Parsed | KrisParsed {
   const s = input.trim();
+
+  let km = s.match(/^kris\s+out\s+([0-9]+(?:\.[0-9]+)?)\s+([0-9]+(?:\.[0-9]+)?)\s*(.*)$/i);
+  if (km) {
+    return {
+      target: "kris",
+      date: todayMMDDYYYY(),
+      action: `${km[3]?.trim() || "Product"} out`.trim(),
+      weight: Number(km[1]),
+      value: Number(km[2]),
+    };
+  }
+
+  km = s.match(/^kris\s+(?:paid|money\s*in)\s+([0-9]+(?:\.[0-9]+)?)\s*(.*)$/i);
+  if (km) {
+    return {
+      target: "kris",
+      date: todayMMDDYYYY(),
+      action: "Money in",
+      value: Number(km[1]),
+    };
+  }
 
   let m = s.match(/^spent\s+([0-9]+(?:\.[0-9]+)?)\s+on\s+(.+)$/i);
   if (m) {
@@ -81,7 +110,7 @@ function parseNatural(input: string): Parsed {
   }
 
   throw new Error(
-    'Could not parse. Try: "spent 24.9 on groceries", "earned 2200 from salary", "invest 300 crypto"'
+    'Could not parse. Try: "spent 24.9 on groceries", "earned 2200 from salary", "invest 300 crypto", "kris out 20 120 mandarin", "kris paid 90"'
   );
 }
 

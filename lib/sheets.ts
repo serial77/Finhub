@@ -290,6 +290,14 @@ export async function fetchDashboardData() {
     }
   }
 
+  let krisPending = 0;
+  try {
+    const kris = await fetchKrisData();
+    krisPending = kris.pending;
+  } catch {
+    krisPending = 0;
+  }
+
   return {
     months: summary,
     crypto: {
@@ -297,6 +305,7 @@ export async function fetchDashboardData() {
       holdings,
     },
     recentMovements,
+    krisPending,
     forecast: {
       horizonMonths: 3,
       avgGrowth,
@@ -360,7 +369,21 @@ export async function appendTransaction(input: TxInput) {
   return { tab, updatedRange: res.data.updates?.updatedRange, row };
 }
 
-let kristinaCache: { at: number; data: any } | null = null;
+type KristinaSummary = {
+  tab: string;
+  dailyAccount: number;
+  savings: number;
+  recentActions: Array<{
+    rowNumber: number;
+    date: string;
+    concept: string;
+    amount: number;
+    type: string;
+    category: string;
+  }>;
+};
+
+let kristinaCache: { at: number; data: KristinaSummary } | null = null;
 
 export async function fetchKristinaData(force = false) {
   const now = Date.now();
@@ -420,4 +443,66 @@ export async function undoKristinaMovement(rowNumber: number) {
   await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: rowRange });
   kristinaCache = null;
   return { ok: true, tab, rowNumber };
+}
+
+function normalizeKrisValue(action: string, rawValue: number) {
+  if (!Number.isFinite(rawValue)) throw new Error("Invalid value");
+  const actionText = action.toLowerCase();
+  if (/money\s*in|paid|payment/i.test(actionText)) return -Math.abs(rawValue);
+  return Math.abs(rawValue);
+}
+
+export async function fetchKrisData() {
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets.readonly"]);
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const [pendingRes, rowsRes] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: "'Kris'!B1", valueRenderOption: "UNFORMATTED_VALUE" }),
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: "'Kris'!A4:E1000", valueRenderOption: "UNFORMATTED_VALUE" }),
+  ]);
+
+  const pending = toNumber((pendingRes.data.values?.[0] || [0])[0]);
+  const rows = (rowsRes.data.values || []).map((r, idx) => ({
+    rowNumber: 4 + idx,
+    date: formatSheetDate(r[0]),
+    action: String(r[1] || ""),
+    weight: toNumber(r[2]),
+    value: toNumber(r[3]),
+    owned: toNumber(r[4]),
+  })).filter((r) => r.action);
+
+  return {
+    pending,
+    recent: rows.slice(-10).reverse(),
+  };
+}
+
+export async function appendKrisMovement(input: { date: string; action: string; weight?: number; value: number }) {
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets"]);
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: "'Kris'!A4:E1000", valueRenderOption: "UNFORMATTED_VALUE" });
+  const rows = existing.data.values || [];
+  const lastOwned = rows.length ? toNumber(rows[rows.length - 1][4]) : 0;
+
+  const signedValue = normalizeKrisValue(input.action, input.value);
+  const newOwned = lastOwned + signedValue;
+
+  const row = [
+    input.date,
+    input.action,
+    input.weight ?? "",
+    signedValue,
+    newOwned,
+  ];
+
+  const res = await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: "'Kris'!A:E",
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: [row] },
+  });
+
+  return { updatedRange: res.data.updates?.updatedRange, row, pending: newOwned };
 }

@@ -58,6 +58,25 @@ type ForecastPoint = {
 
 type Holding = { coin: string; amount: number; euros: number };
 type Movement = { date: string; concept: string; amount: number; type: string; category: string };
+type TransactionParsed = {
+  date?: string;
+  concept: string;
+  amount: number;
+  type: "Income" | "Expense" | "ROI" | "Investment" | "Balance";
+  category?: string;
+  notes?: string;
+};
+type KrisParsed = {
+  target: "kris";
+  date?: string;
+  action: string;
+  weight?: number;
+  value: number;
+};
+
+function isKrisParsed(p: TransactionParsed | KrisParsed): p is KrisParsed {
+  return "target" in p && p.target === "kris";
+}
 
 const shortMonth = (v: string | number) => String(v || "").slice(0, 3);
 
@@ -67,18 +86,12 @@ export default function Home() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [cryptoTotal, setCryptoTotal] = useState(0);
+  const [krisPending, setKrisPending] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [parsed, setParsed] = useState<{
-    date?: string;
-    concept: string;
-    amount: number;
-    type: "Income" | "Expense" | "ROI" | "Investment" | "Balance";
-    category?: string;
-    notes?: string;
-  } | null>(null);
+  const [parsed, setParsed] = useState<TransactionParsed | KrisParsed | null>(null);
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -93,12 +106,14 @@ export default function Home() {
       setHoldings([]);
       setMovements([]);
       setCryptoTotal(0);
+      setKrisPending(0);
     } else {
       setRows(json.months || []);
       setForecast(json.forecast?.points || []);
       setHoldings(json.crypto?.holdings || []);
       setMovements(json.recentMovements || []);
       setCryptoTotal(json.crypto?.total || 0);
+      setKrisPending(json.krisPending || 0);
     }
     setLoading(false);
   };
@@ -132,7 +147,8 @@ export default function Home() {
 
     setSaving(true);
     setError(null);
-    const res = await fetch("/api/transaction", {
+    const isKris = isKrisParsed(parsed);
+    const res = await fetch(isKris ? "/api/kris/submit" : "/api/transaction", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(parsed),
@@ -192,12 +208,13 @@ export default function Home() {
           <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300 text-sm">{error}</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <Kpi icon={<Wallet size={16} />} label="Daily Account" value={latest?.dailyAccount ?? 0} />
               <Kpi icon={<PiggyBank size={16} />} label="Savings" value={latest?.savings ?? 0} />
               <Kpi icon={<Landmark size={16} />} label="Debt" value={latest?.debt ?? 0} />
               <Kpi icon={<Coins size={16} />} label="Crypto" value={cryptoTotal} />
               <Kpi icon={<TrendingUp size={16} />} label="Net Worth" value={latest?.netWorth ?? 0} />
+              <Kpi icon={<BriefcaseBusiness size={16} />} label="Kris Pending" value={krisPending} />
             </div>
 
             <Card title="Quick add transaction">
@@ -205,7 +222,7 @@ export default function Home() {
                 <div className="flex gap-2">
                   <input
                     className="flex-1 rounded-lg bg-[#0d2a63]/45 border border-white/15 px-3 py-2 text-sm"
-                    placeholder='Try: "spent 24.9 on groceries" or "earned 2200 from salary"'
+                    placeholder='Try: "spent 24.9 on groceries", "earned 2200 from salary", "kris out 20 120 mandarin", "kris paid 90"'
                     value={prompt}
                     onChange={(e) => {
                       setPrompt(e.target.value);
@@ -222,7 +239,12 @@ export default function Home() {
                 </div>
                 {parsed && (
                   <div className="rounded-lg border border-white/15 bg-[#0d2a63]/45 p-3 text-xs text-zinc-200">
-                    Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b>
+                    {(() => {
+                      if (isKrisParsed(parsed)) {
+                        return <>Preview → <b>Kris</b> | <b>{parsed.action}</b> | Value: € <b>{parsed.value}</b> {parsed.weight ? <>| Weight: <b>{parsed.weight}</b></> : null} | Date: <b>{parsed.date}</b></>;
+                      }
+                      return <>Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b></>;
+                    })()}
                   </div>
                 )}
               </form>
