@@ -11,8 +11,11 @@ export default function KristinaPage() {
   const [daily, setDaily] = useState(0);
   const [savings, setSavings] = useState(0);
   const [month, setMonth] = useState("");
+  const [actions, setActions] = useState<Array<{ rowNumber: number; date: string; concept: string; amount: number; type: string }>>([]);
   const [success, setSuccess] = useState(false);
   const [sending, setSending] = useState(false);
+  const [undoingRow, setUndoingRow] = useState<number | null>(null);
+  const [confirmUndoRow, setConfirmUndoRow] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -24,7 +27,8 @@ export default function KristinaPage() {
     } else {
       setDaily(json.dailyAccount || 0);
       setSavings(json.savings || 0);
-      setMonth(json.month || "");
+      setMonth(json.tab || json.month || "");
+      setActions(json.recentActions || []);
     }
     setLoading(false);
   };
@@ -54,6 +58,32 @@ export default function KristinaPage() {
     await load();
     setSending(false);
     setTimeout(() => setSuccess(false), 2200);
+  };
+
+  const undoAction = async (rowNumber: number) => {
+    setConfirmUndoRow(rowNumber);
+  };
+
+  const confirmUndo = async () => {
+    if (!confirmUndoRow) return;
+
+    setUndoingRow(confirmUndoRow);
+    setError(null);
+    const res = await fetch("/api/kristina/undo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rowNumber: confirmUndoRow }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      setError(json.error || "Could not undo action");
+      setUndoingRow(null);
+      setConfirmUndoRow(null);
+      return;
+    }
+    await load();
+    setUndoingRow(null);
+    setConfirmUndoRow(null);
   };
 
   return (
@@ -91,6 +121,32 @@ export default function KristinaPage() {
           {error ? <p className="text-sm text-rose-300">{error}</p> : null}
         </motion.form>
 
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-pink-300/20 bg-zinc-900/60 backdrop-blur p-4 space-y-2">
+          <div className="text-sm text-zinc-200">Last actions</div>
+          {actions.length ? (
+            actions.map((a) => (
+              <div key={a.rowNumber} className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0 text-sm text-zinc-100 truncate">
+                  <span className="font-medium">{a.concept}</span>
+                  <span className="text-zinc-400"> • {a.date} • {a.type}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-rose-200">€ {a.amount}</div>
+                  <button
+                    onClick={() => undoAction(a.rowNumber)}
+                    disabled={undoingRow === a.rowNumber}
+                    className="text-xs rounded-lg px-2 py-1 border border-rose-300/30 bg-rose-500/15 hover:bg-rose-500/25 disabled:opacity-60"
+                  >
+                    {undoingRow === a.rowNumber ? "Undo..." : "Undo"}
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-zinc-400">No actions yet.</div>
+          )}
+        </motion.div>
+
         <AnimatePresence>
           {success && (
             <motion.div
@@ -105,6 +161,41 @@ export default function KristinaPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {confirmUndoRow && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="w-full max-w-sm rounded-2xl border border-pink-300/25 bg-gradient-to-b from-fuchsia-950/90 to-violet-950/90 p-5"
+            >
+              <div className="text-lg font-semibold">Undo this action?</div>
+              <p className="mt-2 text-sm text-zinc-300">This will remove that row from the sheet. You can’t auto-redo it.</p>
+              <div className="mt-4 flex gap-2 justify-end">
+                <button
+                  onClick={() => setConfirmUndoRow(null)}
+                  className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm hover:bg-white/20"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmUndo}
+                  className="rounded-lg border border-rose-300/30 bg-rose-500/20 px-3 py-2 text-sm hover:bg-rose-500/30"
+                >
+                  Yes, undo
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

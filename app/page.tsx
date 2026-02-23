@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   Area,
@@ -10,13 +10,23 @@ import {
   ComposedChart,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  ReferenceLine,
 } from "recharts";
-import { Wallet, PiggyBank, TrendingUp, Landmark, Coins, ArrowDownCircle, ArrowUpCircle, Sparkles, BriefcaseBusiness } from "lucide-react";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  BriefcaseBusiness,
+  Coins,
+  Landmark,
+  PiggyBank,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 
 type Row = {
   month: string;
@@ -46,19 +56,8 @@ type ForecastPoint = {
   projectedDebtHigh: number;
 };
 
-type Holding = {
-  coin: string;
-  amount: number;
-  euros: number;
-};
-
-type Movement = {
-  date: string;
-  concept: string;
-  amount: number;
-  type: string;
-  category: string;
-};
+type Holding = { coin: string; amount: number; euros: number };
+type Movement = { date: string; concept: string; amount: number; type: string; category: string };
 
 const shortMonth = (v: string | number) => String(v || "").slice(0, 3);
 
@@ -86,6 +85,7 @@ export default function Home() {
     setError(null);
     const res = await fetch("/api/dashboard", { cache: "no-store" });
     const json = await res.json();
+
     if (!res.ok) {
       setError(json.error || "Failed to load dashboard data");
       setRows([]);
@@ -138,6 +138,7 @@ export default function Home() {
       body: JSON.stringify(parsed),
     });
     const json = await res.json();
+
     if (!res.ok) {
       setError(json.error || "Failed to add transaction");
     } else {
@@ -149,22 +150,27 @@ export default function Home() {
   };
 
   const latest = rows[rows.length - 1];
-  const totals = useMemo(() => {
-    return rows.reduce(
-      (acc, r) => {
-        acc.income += r.income;
-        acc.expenses += r.expenses;
-        acc.roi += r.roi;
-        acc.investment += r.investment;
-        return acc;
-      },
-      { income: 0, expenses: 0, roi: 0, investment: 0 }
-    );
-  }, [rows]);
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, r) => {
+          acc.income += r.income;
+          acc.expenses += r.expenses;
+          acc.roi += r.roi;
+          acc.investment += r.investment;
+          return acc;
+        },
+        { income: 0, expenses: 0, roi: 0, investment: 0 }
+      ),
+    [rows]
+  );
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#070f2c] via-[#081b4a] to-[#0a2b66] text-zinc-100 p-6 md:p-10 relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "repeating-linear-gradient(0deg, #7dd3fc 0px, #7dd3fc 1px, transparent 1px, transparent 3px)" }} />
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.08]"
+        style={{ backgroundImage: "repeating-linear-gradient(0deg, #7dd3fc 0px, #7dd3fc 1px, transparent 1px, transparent 3px)" }}
+      />
       <div className="pointer-events-none absolute -top-32 -left-24 w-80 h-80 rounded-full bg-cyan-400/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-emerald-400/15 blur-3xl" />
 
@@ -181,7 +187,7 @@ export default function Home() {
         </div>
 
         {loading ? (
-          <div className="text-zinc-400">Loading…</div>
+          <div className="text-zinc-300">Loading…</div>
         ) : error ? (
           <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300 text-sm">{error}</div>
         ) : (
@@ -198,7 +204,7 @@ export default function Home() {
               <form onSubmit={submitQuickAdd} className="space-y-2">
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm"
+                    className="flex-1 rounded-lg bg-[#0d2a63]/45 border border-white/15 px-3 py-2 text-sm"
                     placeholder='Try: "spent 24.9 on groceries" or "earned 2200 from salary"'
                     value={prompt}
                     onChange={(e) => {
@@ -215,25 +221,23 @@ export default function Home() {
                   </button>
                 </div>
                 {parsed && (
-                  <div className="rounded-lg border border-white/15 bg-white/5 p-3 text-xs text-zinc-200">
-                    <div>
-                      Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b> | Category: <b>{parsed.category || "General"}</b>
-                    </div>
+                  <div className="rounded-lg border border-white/15 bg-[#0d2a63]/45 p-3 text-xs text-zinc-200">
+                    Preview → <b>{parsed.type}</b> | <b>{parsed.concept}</b> | € <b>{parsed.amount}</b> | Date: <b>{parsed.date}</b>
                   </div>
                 )}
               </form>
             </Card>
 
             <Card title="Monthly totals (Income / Expenses / ROI / Investment)">
-              <ChartWrap>
-                <ResponsiveContainer width="100%" height={320}>
-                  <BarChart data={rows}>
+              <div className="w-full h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 2 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
-                    <XAxis dataKey="month" stroke="#a1a1aa" />
-                    <YAxis stroke="#a1a1aa" />
+                    <XAxis dataKey="month" stroke="#8b8ba7" tick={{ fontSize: 8 }} tickMargin={1} height={16} tickFormatter={shortMonth} minTickGap={18} />
+                    <YAxis stroke="#8b8ba7" tick={{ fontSize: 10 }} width={38} />
                     <Tooltip
                       cursor={{ fill: "rgba(255,255,255,0.06)" }}
-                      contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                      contentStyle={{ background: "#0b1e4f", border: "1px solid rgba(58,160,255,0.35)", borderRadius: 12 }}
                       labelStyle={{ color: "#d8d4fe" }}
                     />
                     <Bar dataKey="income" fill="#00d5ff" />
@@ -242,70 +246,72 @@ export default function Home() {
                     <Bar dataKey="investment" fill="#ffe600" />
                   </BarChart>
                 </ResponsiveContainer>
-              </ChartWrap>
+              </div>
             </Card>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card title="Savings evolution">
-                <ChartWrap>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={rows}>
+                <div className="w-full h-[220px] md:h-[230px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={rows} margin={{ top: 6, right: 8, left: -6, bottom: 2 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
-                      <XAxis dataKey="month" stroke="#a1a1aa" />
-                      <YAxis stroke="#a1a1aa" />
+                      <XAxis dataKey="month" stroke="#8b8ba7" tick={{ fontSize: 8 }} tickMargin={1} height={16} tickFormatter={shortMonth} minTickGap={18} />
+                      <YAxis stroke="#8b8ba7" tick={{ fontSize: 10 }} width={34} />
                       <Tooltip
-                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
-                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        cursor={{ stroke: "rgba(255,255,255,0.16)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#0b1e4f", border: "1px solid rgba(58,160,255,0.35)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
                       <Line type="monotone" dataKey="savings" stroke="#00d5ff" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
-                </ChartWrap>
+                </div>
               </Card>
 
               <Card title="Debt evolution">
-                <ChartWrap>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={rows}>
+                <div className="w-full h-[220px] md:h-[230px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={rows} margin={{ top: 6, right: 8, left: -6, bottom: 2 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
-                      <XAxis dataKey="month" stroke="#a1a1aa" />
-                      <YAxis stroke="#a1a1aa" />
+                      <XAxis dataKey="month" stroke="#8b8ba7" tick={{ fontSize: 8 }} tickMargin={1} height={16} tickFormatter={shortMonth} minTickGap={18} />
+                      <YAxis stroke="#8b8ba7" tick={{ fontSize: 10 }} width={34} />
                       <Tooltip
-                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
-                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        cursor={{ stroke: "rgba(255,255,255,0.16)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#0b1e4f", border: "1px solid rgba(58,160,255,0.35)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
                       <Line type="monotone" dataKey="debt" stroke="#ff4b4b" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
-                </ChartWrap>
+                </div>
               </Card>
 
               <Card title="Net worth evolution">
-                <ChartWrap>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <LineChart data={rows}>
+                <div className="w-full h-[220px] md:h-[230px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={rows} margin={{ top: 6, right: 8, left: -6, bottom: 2 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
-                      <XAxis dataKey="month" stroke="#a1a1aa" />
-                      <YAxis stroke="#a1a1aa" />
+                      <XAxis dataKey="month" stroke="#8b8ba7" tick={{ fontSize: 8 }} tickMargin={1} height={16} tickFormatter={shortMonth} minTickGap={18} />
+                      <YAxis stroke="#8b8ba7" tick={{ fontSize: 10 }} width={34} />
                       <Tooltip
-                        cursor={{ stroke: "rgba(255,255,255,0.2)", strokeWidth: 1 }}
-                        contentStyle={{ background: "#1c1248", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12 }}
+                        cursor={{ stroke: "rgba(255,255,255,0.16)", strokeWidth: 1 }}
+                        contentStyle={{ background: "#0b1e4f", border: "1px solid rgba(58,160,255,0.35)", borderRadius: 12 }}
                         labelStyle={{ color: "#d8d4fe" }}
                       />
                       <Line type="monotone" dataKey="netWorth" stroke="#b06cff" strokeWidth={3} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
-                </ChartWrap>
+                </div>
               </Card>
             </div>
 
             <Card title="Crypto portfolio">
-              <div className="mb-3 text-sm text-zinc-300">Total: <span className="font-semibold text-amber-300">€ {cryptoTotal.toLocaleString()}</span></div>
+              <div className="mb-3 text-sm text-zinc-300">
+                Total: <span className="font-semibold text-amber-300">€ {cryptoTotal.toLocaleString()}</span>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 {holdings.map((h) => (
-                  <div key={h.coin} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 flex items-center justify-between">
+                  <div key={h.coin} className="rounded-lg border border-white/15 bg-[#0d2a63]/45 p-3 flex items-center justify-between">
                     <div>
                       <div className="font-semibold">{h.coin}</div>
                       <div className="text-zinc-400 text-xs">{h.amount.toLocaleString()}</div>
@@ -318,27 +324,29 @@ export default function Home() {
 
             <Card title="3-month forecast (with confidence bands)">
               <div className="mb-3 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Purple/red shaded zones = confidence bands</div>
-                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Savings should trend up, debt should trend down</div>
-                <div className="rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-zinc-200">Growth shown on right axis</div>
+                <div className="rounded-lg bg-[#0d2a63]/45 border border-white/15 px-3 py-2 text-zinc-200">Purple/red shaded zones = confidence bands</div>
+                <div className="rounded-lg bg-[#0d2a63]/45 border border-white/15 px-3 py-2 text-zinc-200">Savings should trend up, debt should trend down</div>
+                <div className="rounded-lg bg-[#0d2a63]/45 border border-white/15 px-3 py-2 text-zinc-200">Growth shown on right axis</div>
               </div>
-              <ChartWrap>
-                <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={forecast} margin={{ top: 8, right: 24, left: 8, bottom: 4 }}>
+              <div className="w-full h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={forecast} margin={{ top: 8, right: 16, left: 20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#2f2f2f" />
-                    <XAxis dataKey="month" stroke="#a1a1aa" />
-                    <YAxis yAxisId="left" stroke="#a1a1aa" />
-                    <YAxis yAxisId="right" orientation="right" stroke="#39ff88" />
+                    <XAxis dataKey="month" stroke="#8b8ba7" tick={{ fontSize: 8 }} tickMargin={6} height={22} tickFormatter={shortMonth} minTickGap={20} />
+                    <YAxis yAxisId="left" stroke="#8b8ba7" tick={{ fontSize: 10 }} width={38} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#39ff88" tick={{ fontSize: 10 }} width={34} />
                     <ReferenceLine yAxisId="right" y={0} stroke="#3f3f46" strokeDasharray="4 4" />
-                    <Tooltip contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 12 }} labelStyle={{ color: "#d4d4d8" }} />
-                    <Legend />
-                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsHigh" stroke="none" fill="#8b5cf640" name="Savings band (high)" />
-                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsLow" stroke="none" fill="#8b5cf620" name="Savings band (low)" />
-                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtHigh" stroke="none" fill="#fb718540" name="Debt band (high)" />
-                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtLow" stroke="none" fill="#fb718520" name="Debt band (low)" />
-                    <Line yAxisId="left" type="monotone" dataKey="projectedSavings" name="Projected Savings" stroke="#a78bfa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    <Line yAxisId="left" type="monotone" dataKey="projectedDebt" name="Projected Debt" stroke="#fb7185" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                    <Line yAxisId="right" type="monotone" dataKey="projectedGrowth" name="Projected Growth" stroke="#22c55e" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                    <Tooltip
+                      contentStyle={{ background: "#0b1e4f", border: "1px solid rgba(58,160,255,0.35)", borderRadius: 12 }}
+                      labelStyle={{ color: "#d8d4fe" }}
+                    />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsHigh" stroke="none" fill="#8b5cf640" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedSavingsLow" stroke="none" fill="#8b5cf620" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtHigh" stroke="none" fill="#ff4b4b40" />
+                    <Area yAxisId="left" type="monotone" dataKey="projectedDebtLow" stroke="none" fill="#ff4b4b20" />
+                    <Line yAxisId="left" type="monotone" dataKey="projectedSavings" stroke="#b06cff" strokeWidth={3} dot={{ r: 2 }} />
+                    <Line yAxisId="left" type="monotone" dataKey="projectedDebt" stroke="#ff4b4b" strokeWidth={3} dot={{ r: 2 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="projectedGrowth" stroke="#39ff88" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 1 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -349,9 +357,9 @@ export default function Home() {
                 {movements.map((m, idx) => {
                   const meta = movementMeta(m.type);
                   return (
-                    <div key={`${m.date}-${m.concept}-${idx}`} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 flex items-center justify-between gap-3">
+                    <div key={`${m.date}-${m.concept}-${idx}`} className="rounded-lg border border-white/15 bg-[#0d2a63]/45 px-3 py-2 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0 text-sm text-zinc-100">
-                        <span className={`${meta.color}`}>{meta.icon}</span>
+                        <span className={meta.color}>{meta.icon}</span>
                         <span className="truncate">{m.concept}</span>
                         <span className="text-zinc-400">•</span>
                         <span className="text-zinc-400 whitespace-nowrap">{m.date}</span>
@@ -368,10 +376,10 @@ export default function Home() {
 
             <Card title="YTD quick totals">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <Badge label="Income" value={totals.income} color="text-green-400" />
-                <Badge label="Expenses" value={Math.abs(totals.expenses)} color="text-red-400" />
-                <Badge label="ROI" value={totals.roi} color="text-lime-400" />
-                <Badge label="Investment" value={Math.abs(totals.investment)} color="text-yellow-300" />
+                <Badge label="Income" value={totals.income} color="text-green-300" />
+                <Badge label="Expenses" value={Math.abs(totals.expenses)} color="text-red-300" />
+                <Badge label="ROI" value={totals.roi} color="text-lime-300" />
+                <Badge label="Investment" value={Math.abs(totals.investment)} color="text-amber-300" />
               </div>
             </Card>
           </>
@@ -383,10 +391,10 @@ export default function Home() {
 
 function movementMeta(type: string) {
   const t = String(type || "").toLowerCase();
-  if (t === "expense") return { icon: <ArrowDownCircle size={16} />, color: "text-pink-400", amountColor: "text-pink-300" };
-  if (t === "income") return { icon: <ArrowUpCircle size={16} />, color: "text-cyan-300", amountColor: "text-cyan-200" };
-  if (t === "roi") return { icon: <Sparkles size={16} />, color: "text-lime-300", amountColor: "text-lime-200" };
-  if (t === "investment") return { icon: <BriefcaseBusiness size={16} />, color: "text-amber-300", amountColor: "text-amber-200" };
+  if (t === "expense") return { icon: <ArrowDownCircle size={16} />, color: "text-red-300", amountColor: "text-red-300" };
+  if (t === "income") return { icon: <ArrowUpCircle size={16} />, color: "text-cyan-300", amountColor: "text-cyan-300" };
+  if (t === "roi") return { icon: <Sparkles size={16} />, color: "text-lime-300", amountColor: "text-lime-300" };
+  if (t === "investment") return { icon: <BriefcaseBusiness size={16} />, color: "text-amber-300", amountColor: "text-amber-300" };
   return { icon: <Coins size={16} />, color: "text-zinc-300", amountColor: "text-zinc-200" };
 }
 
@@ -410,20 +418,23 @@ function Card({ title, children }: { title: string; children: ReactNode }) {
       animate={{ opacity: 1, y: 0 }}
       className="rounded-2xl border border-cyan-300/20 bg-[#0a1f54]/82 p-4 shadow-[0_8px_30px_rgba(0,0,0,0.35),inset_0_0_20px_rgba(0,213,255,0.05)] relative overflow-hidden"
     >
-      <div className="pointer-events-none absolute inset-0 opacity-[0.05]" style={{ backgroundImage: "linear-gradient(90deg, rgba(34,211,238,0.35) 1px, transparent 1px), linear-gradient(0deg, rgba(34,211,238,0.25) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-      <h2 className="mb-3 text-sm text-cyan-200/90">{title}</h2>
-      {children}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            "linear-gradient(90deg, rgba(34,211,238,0.35) 1px, transparent 1px), linear-gradient(0deg, rgba(34,211,238,0.25) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+      <h2 className="mb-3 text-sm text-cyan-200/90 relative">{title}</h2>
+      <div className="relative">{children}</div>
     </motion.section>
   );
 }
 
-function ChartWrap({ children }: { children: ReactNode }) {
-  return <div className="w-full h-[320px] md:h-[340px]">{children}</div>;
-}
-
 function Badge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="rounded-xl border border-white/15 bg-white/5 p-3">
+    <div className="rounded-xl border border-white/15 bg-[#0d2a63]/45 p-3">
       <div className="text-zinc-300">{label}</div>
       <div className={`font-semibold ${color}`}>€ {value.toLocaleString()}</div>
     </div>

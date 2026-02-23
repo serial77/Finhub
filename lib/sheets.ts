@@ -11,6 +11,28 @@ function toNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function formatSheetDate(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "";
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // Google Sheets date serial (days since 1899-12-30)
+    const epoch = Date.UTC(1899, 11, 30);
+    const ms = Math.round(value * 86400000);
+    const d = new Date(epoch + ms);
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`;
+  }
+
+  const n = Number(value);
+  if (Number.isFinite(n) && String(value).trim() !== "") {
+    const epoch = Date.UTC(1899, 11, 30);
+    const ms = Math.round(n * 86400000);
+    const d = new Date(epoch + ms);
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}/${d.getUTCFullYear()}`;
+  }
+
+  return String(value);
+}
+
 function findValueByLabel(grid: unknown[][], labelRegex: RegExp): number | null {
   for (const row of grid) {
     for (let i = 0; i < row.length; i++) {
@@ -300,14 +322,16 @@ async function resolveWriteTab(sheets: ReturnType<typeof google.sheets>) {
   return monthTabs[monthTabs.length - 1] || BASE_TAB;
 }
 
-export async function appendTransaction(input: {
+type TxInput = {
   date: string;
   concept: string;
   amount: number;
   type: "Income" | "Expense" | "ROI" | "Investment" | "Balance";
   category?: string;
   notes?: string;
-}) {
+};
+
+export async function appendTransaction(input: TxInput) {
   const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets"]);
   const sheets = google.sheets({ version: "v4", auth });
   const tab = await resolveWriteTab(sheets);
@@ -334,4 +358,66 @@ export async function appendTransaction(input: {
   });
 
   return { tab, updatedRange: res.data.updates?.updatedRange, row };
+}
+
+let kristinaCache: { at: number; data: any } | null = null;
+
+export async function fetchKristinaData(force = false) {
+  const now = Date.now();
+  if (!force && kristinaCache && now - kristinaCache.at < 30000) return kristinaCache.data;
+
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets.readonly"]);
+  const sheets = google.sheets({ version: "v4", auth });
+  const tab = await resolveWriteTab(sheets);
+
+  const [summary, daily] = await Promise.all([
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!B3:B4`, valueRenderOption: "UNFORMATTED_VALUE" }),
+    sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: `'${tab}'!A11:F1000`, valueRenderOption: "UNFORMATTED_VALUE" }),
+  ]);
+
+  const dailyAccount = toNumber((summary.data.values?.[0] || [0])[0]);
+  const savings = toNumber((summary.data.values?.[1] || [0])[0]);
+
+  const recentActions = (daily.data.values || [])
+    .map((r, idx) => ({
+      rowNumber: 11 + idx,
+      date: formatSheetDate(r[0]),
+      concept: String(r[1] || ""),
+      amount: toNumber(r[2]),
+      type: String(r[3] || ""),
+      category: String(r[4] || ""),
+    }))
+    .filter((r) => /^kristina\s*-/i.test(r.concept))
+    .slice(-5)
+    .reverse();
+
+  const data = { tab, dailyAccount, savings, recentActions };
+  kristinaCache = { at: now, data };
+  return data;
+}
+
+export async function appendKristinaTransaction(input: TxInput) {
+  const out = await appendTransaction({ ...input, concept: /^kristina\s*-/i.test(input.concept) ? input.concept : `Kristina - ${input.concept}` });
+  kristinaCache = null;
+  return out;
+}
+
+export async function undoKristinaMovement(rowNumber: number) {
+  if (!Number.isFinite(rowNumber) || rowNumber < 11) throw new Error("Invalid row number");
+
+  const auth = getAuth(["https://www.googleapis.com/auth/spreadsheets"]);
+  const sheets = google.sheets({ version: "v4", auth });
+  const tab = await resolveWriteTab(sheets);
+
+  const rowRange = `'${tab}'!A${rowNumber}:F${rowNumber}`;
+  const existing = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: rowRange, valueRenderOption: "UNFORMATTED_VALUE" });
+  const row = (existing.data.values || [[]])[0];
+  const concept = String(row[1] || "");
+  if (!/^kristina\s*-/i.test(concept)) {
+    throw new Error("This row is not a Kristina entry");
+  }
+
+  await sheets.spreadsheets.values.clear({ spreadsheetId: SHEET_ID, range: rowRange });
+  kristinaCache = null;
+  return { ok: true, tab, rowNumber };
 }

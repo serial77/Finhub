@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { appendTransaction } from "@/lib/sheets";
+import { appendKristinaTransaction } from "@/lib/sheets";
 
 function todayMMDDYYYY() {
   const d = new Date();
@@ -18,13 +18,13 @@ function inferCategory(text: string) {
 function parseNatural(prompt: string) {
   const s = prompt.trim();
 
-  let m = s.match(/^i\s*took\s+([0-9]+(?:\.[0-9]+)?)\s+(?:for|on)\s+(.+)$/i);
+  let m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s+(?:for|on)\s+(.+)$/i);
   if (m) return { amount: Number(m[1]), concept: m[2], type: "Expense" as const, date: todayMMDDYYYY() };
 
-  m = s.match(/^took\s+([0-9]+(?:\.[0-9]+)?)\s+(?:for|on)\s+(.+)$/i);
+  m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s+(.+)$/i);
   if (m) return { amount: Number(m[1]), concept: m[2], type: "Expense" as const, date: todayMMDDYYYY() };
 
-  m = s.match(/^spent\s+([0-9]+(?:\.[0-9]+)?)\s+(?:for|on)\s+(.+)$/i);
+  m = s.match(/^(?:i\s+)?(?:take|took|spent)\s+([0-9]+(?:\.[0-9]+)?)\s+(?:(?:for|on)\s+)?(.+)$/i);
   if (m) return { amount: Number(m[1]), concept: m[2], type: "Expense" as const, date: todayMMDDYYYY() };
 
   m = s.match(/^add\s+expense\s+([0-9]+(?:\.[0-9]+)?)\s+(.+)$/i);
@@ -41,9 +41,9 @@ export async function POST(req: Request) {
     }
 
     const parsed = parseNatural(prompt);
-    const result = await appendTransaction({
+    const result = await appendKristinaTransaction({
       date: parsed.date,
-      concept: `Kristina - ${parsed.concept}`,
+      concept: parsed.concept,
       amount: parsed.amount,
       type: parsed.type,
       category: inferCategory(parsed.concept),
