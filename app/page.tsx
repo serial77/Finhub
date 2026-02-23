@@ -17,7 +17,7 @@ import {
   YAxis,
   ReferenceLine,
 } from "recharts";
-import { Wallet, PiggyBank, TrendingUp, Landmark, Coins } from "lucide-react";
+import { Wallet, PiggyBank, TrendingUp, Landmark, Coins, ArrowDownCircle, ArrowUpCircle, Sparkles, BriefcaseBusiness } from "lucide-react";
 
 type Row = {
   month: string;
@@ -53,10 +53,19 @@ type Holding = {
   euros: number;
 };
 
+type Movement = {
+  date: string;
+  concept: string;
+  amount: number;
+  type: string;
+  category: string;
+};
+
 export default function Home() {
   const [rows, setRows] = useState<Row[]>([]);
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [movements, setMovements] = useState<Movement[]>([]);
   const [cryptoTotal, setCryptoTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,11 +90,13 @@ export default function Home() {
       setRows([]);
       setForecast([]);
       setHoldings([]);
+      setMovements([]);
       setCryptoTotal(0);
     } else {
       setRows(json.months || []);
       setForecast(json.forecast?.points || []);
       setHoldings(json.crypto?.holdings || []);
+      setMovements(json.recentMovements || []);
       setCryptoTotal(json.crypto?.total || 0);
     }
     setLoading(false);
@@ -328,6 +339,27 @@ export default function Home() {
               </ChartWrap>
             </Card>
 
+            <Card title="Last 5 daily movements">
+              <div className="space-y-2">
+                {movements.map((m, idx) => {
+                  const meta = movementMeta(m.type);
+                  return (
+                    <div key={`${m.date}-${m.concept}-${idx}`} className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`${meta.color}`}>{meta.icon}</span>
+                        <div className="min-w-0">
+                          <div className="text-sm text-zinc-100 truncate">{m.concept}</div>
+                          <div className="text-xs text-zinc-400">{m.date} • {m.type}</div>
+                        </div>
+                      </div>
+                      <div className={`text-sm font-semibold ${meta.amountColor}`}>€ {m.amount.toLocaleString()}</div>
+                    </div>
+                  );
+                })}
+                {!movements.length && <div className="text-sm text-zinc-400">No movements found.</div>}
+              </div>
+            </Card>
+
             <Card title="YTD quick totals">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <Badge label="Income" value={totals.income} color="text-green-400" />
@@ -341,6 +373,15 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+function movementMeta(type: string) {
+  const t = String(type || "").toLowerCase();
+  if (t === "expense") return { icon: <ArrowDownCircle size={16} />, color: "text-pink-400", amountColor: "text-pink-300" };
+  if (t === "income") return { icon: <ArrowUpCircle size={16} />, color: "text-cyan-300", amountColor: "text-cyan-200" };
+  if (t === "roi") return { icon: <Sparkles size={16} />, color: "text-lime-300", amountColor: "text-lime-200" };
+  if (t === "investment") return { icon: <BriefcaseBusiness size={16} />, color: "text-amber-300", amountColor: "text-amber-200" };
+  return { icon: <Coins size={16} />, color: "text-zinc-300", amountColor: "text-zinc-200" };
 }
 
 function Kpi({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {

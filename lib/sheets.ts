@@ -190,6 +190,19 @@ export async function fetchDashboardData() {
     .map((r) => ({ coin: String(r[0] || "").trim(), amount: toNumber(r[1]), euros: toNumber(r[2]) }))
     .filter((r) => r.coin && (r.amount !== 0 || r.euros !== 0));
 
+  const recentDailyRes = await safeGet(`'${latestTab}'!A11:F1000`);
+  const recentMovements = (recentDailyRes.data.values || [])
+    .map((r) => ({
+      date: String(r[0] || ""),
+      concept: String(r[1] || ""),
+      amount: toNumber(r[2]),
+      type: String(r[3] || ""),
+      category: String(r[4] || ""),
+    }))
+    .filter((r) => r.concept && r.type)
+    .slice(-5)
+    .reverse();
+
   const recent = summary.slice(-3);
   const avg = (key: keyof (typeof summary)[number]) => recent.length ? recent.reduce((a, r) => a + Number(r[key] || 0), 0) / recent.length : 0;
 
@@ -261,6 +274,7 @@ export async function fetchDashboardData() {
       total: summary[summary.length - 1]?.crypto || 0,
       holdings,
     },
+    recentMovements,
     forecast: {
       horizonMonths: 3,
       avgGrowth,
