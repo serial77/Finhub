@@ -166,6 +166,7 @@ export default function Home() {
   };
 
   const latest = rows[rows.length - 1];
+  const accountsTotal = (latest?.dailyAccount ?? 0) + (latest?.savings ?? 0);
   const totals = useMemo(
     () =>
       rows.reduce(
@@ -208,9 +209,10 @@ export default function Home() {
           <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-red-300 text-sm">{error}</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
               <Kpi icon={<Wallet size={16} />} label="Daily Account" value={latest?.dailyAccount ?? 0} />
               <Kpi icon={<PiggyBank size={16} />} label="Savings" value={latest?.savings ?? 0} />
+              <Kpi icon={<Landmark size={16} />} label="Accounts Total" value={accountsTotal} />
               <Kpi icon={<Landmark size={16} />} label="Debt" value={latest?.debt ?? 0} />
               <Kpi icon={<Coins size={16} />} label="Crypto" value={cryptoTotal} />
               <Kpi icon={<TrendingUp size={16} />} label="Net Worth" value={latest?.netWorth ?? 0} />
